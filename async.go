@@ -49,8 +49,11 @@ func (a *Async) Do(handler interface{}, params ...interface{}) {
 
 // Close sends quit signal to watcher and releases all the resources.
 // Wait for all tasks complete to close
-func (a *Async) Close() {
-	a.quit <- true
-	// wait for watcher quit
+func (a *Async) Close(wait bool) {
+	if !wait {
+		close(a.quit)
+	}
 	<-a.quit
+	// wait for watcher quit
+	//<-a.quit
 }

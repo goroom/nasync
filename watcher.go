@@ -6,28 +6,24 @@ import (
 
 // watcher watches the async.queue channel, and writes the logs to output
 func (a *Async) watcher() {
+	defer close(a.quit)
 	var buf buffer
 	for {
-		timeout := time.After(time.Second / 10)
+		timeout := time.After(time.Second / 2)
 		for i := 0; i < a.bufSize; i++ {
 			select {
 			case req := <-a.taskChan:
 				a.flushReq(&buf, req)
 			case <-timeout:
-				i = a.bufSize
+				goto ForEnd
 			case <-a.quit:
-				// If quit signal received, cleans the channel
-				for {
-					select {
-					case req := <-a.taskChan:
-						a.flushReq(&buf, req)
-					default:
-						a.flushBuf(&buf)
-						a.quit <- true
-						return
-					}
-				}
+				return
+
 			}
+		}
+	ForEnd:
+		if len(buf.Tasks()) == 0 {
+			break
 		}
 		a.flushBuf(&buf)
 	}
