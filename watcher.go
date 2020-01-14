@@ -6,7 +6,10 @@ import (
 
 // watcher watches the async.queue channel, and writes the logs to output
 func (a *Async) watcher() {
-	defer close(a.quit)
+	defer func() {
+		close(a.forceQuit)
+	}()
+
 	var buf buffer
 	for {
 		timeout := time.After(time.Second / 2)
@@ -17,7 +20,7 @@ func (a *Async) watcher() {
 			case <-timeout:
 				goto ForEnd
 			case <-a.quit:
-				return
+				goto ForEnd
 
 			}
 		}

@@ -1,6 +1,9 @@
 package nasync
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 const (
 	//DefaultReqSize Default max goroutine created
@@ -22,19 +25,21 @@ func Do(handler interface{}, params ...interface{}) {
 
 //Async  async model
 type Async struct {
-	quit     chan bool  // quit signal for the watcher to quit
-	taskChan chan *task // queue used in non-runtime  tasks
-	bufSize  int
-	wait     *sync.WaitGroup
+	quit      chan bool  // quit signal for the watcher to quit
+	taskChan  chan *task // queue used in non-runtime  tasks
+	bufSize   int
+	forceQuit chan bool
+	wait      *sync.WaitGroup
 }
 
 //New custom your async
 func New(ReqSize int, BufSzie int) *Async {
 	as := Async{
-		quit:     make(chan bool),
-		taskChan: make(chan *task, ReqSize),
-		bufSize:  BufSzie,
-		wait:     &sync.WaitGroup{},
+		quit:      make(chan bool),
+		forceQuit: make(chan bool),
+		taskChan:  make(chan *task, ReqSize),
+		bufSize:   BufSzie,
+		wait:      &sync.WaitGroup{},
 	}
 
 	go as.watcher()
@@ -50,10 +55,19 @@ func (a *Async) Do(handler interface{}, params ...interface{}) {
 // Close sends quit signal to watcher and releases all the resources.
 // Wait for all tasks complete to close
 func (a *Async) Close(wait bool) {
-	if !wait {
-		close(a.quit)
+	for {
+		select {
+		case <-a.quit:
+			return
+		case <-a.forceQuit:
+			close(a.quit)
+			return
+		default:
+			if !wait {
+				close(a.quit)
+			}
+			time.Sleep(time.Second/2)
+		}
 	}
-	<-a.quit
-	// wait for watcher quit
-	//<-a.quit
+
 }
